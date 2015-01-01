@@ -95,3 +95,156 @@ for (i in 1:nrow(trainData)) {
   }
 }
 
+"adding new variables to the table from using the existing ones"
+
+#child
+trainData["Child"] <- NA
+for (i in 1:nrow(trainData)) {
+  if (trainData$Age[i] <= 12) {
+    trainData$Child[i] = 1
+  } else {
+    trainData$Child[i] = 2
+  }
+}
+
+#family guy
+trainData["Family"] = NA
+
+for(i in 1:nrow(trainData)) {
+  x = trainData$SibSp[i]
+  y = trainData$Parch[i]
+  trainData$Family[i] = x + y + 1
+}
+
+#Mom
+trainData["Mother"] <- NA
+for(i in 1:nrow(trainData)) {
+  if(trainData$Name[i] == "Mrs" & trainData$Parch[i] > 0) {
+    trainData$Mother[i] = 1
+  } else {
+    trainData$Mother[i] = 2
+  }
+}
+"==========================================================="
+"until now. we have worked on the trainData till, we repeat similar 
+steps for testData which doesn't have the surived column"
+"============================================================"
+
+summary(testData) 
+#totalPassengers = 418
+nrow(testData)
+ 
+
+#plotting a few parameters to get feel of the distributions
+plot(density(testData$Age, na.rm = TRUE))
+plot(density(testData$Pclass, na.rm = TRUE))
+
+plot(density(testData$Fare, na.rm = TRUE))
+
+  
+
+#CLEANING DATA
+
+#replacing male with 0 female with 1
+testData$Sex <- gsub("female", 1, testData$Sex)
+testData$Sex <- gsub("male", 0, testData$Sex)
+head(testData)
+#removed the unwanted variables from testData
+testData <- (testData[-c(1,8:11)])
+
+"there are a lot of missing age values. How author has decided to
+nullify that effect is to estimate/ guess the values of ages based on 
+the title of the people. 
+"
+
+"there are roughty so many kind of titles"
+test_master_vector = grep("Master.",testData$Name)
+test_miss_vector = grep("Miss.", testData$Name)
+test_mrs_vector = grep("Mrs.", testData$Name)
+test_mr_vector = grep("Mr.", testData$Name)
+test_dr_vector = grep("Dr.", testData$Name)
+
+"average of people in that category"
+test_master_age <- round(mean(trainData$Age[test_master_vector], na.rm = TRUE), digits = 2)
+test_miss_age <- round(mean(trainData$Age[test_miss_vector], na.rm = TRUE), digits =2)
+test_mrs_age <- round(mean(trainData$Age[test_mrs_vector], na.rm = TRUE), digits = 2)
+test_mr_age <- round(mean(trainData$Age[test_mr_vector], na.rm = TRUE), digits = 2)
+test_dr_age <- round(mean(trainData$Age[test_dr_vector], na.rm = TRUE), digits = 2)
+
+"replacing those missing values with the assumed average value"
+for (i in 1:nrow(testData)) {
+  if (is.na(testData[i,4])) {    
+    if (i %in% test_master_vector) {
+      testData$Age[i] = test_master_age
+      print("Master")
+    } else if (i %in% test_miss_vector) {
+      print("Miss")
+      testData$Age[i] = test_miss_age
+    } else if (i %in% test_mrs_vector) {
+      print("Mrs")
+      testData$Age[i] = test_mrs_age
+    } else if (i %in% test_mr_vector) {
+      print("Mr")
+      testData$Age[i] = test_mr_age
+    } else if (i %in% test_dr_vector) {
+      print("dr")
+      testData$Age[i] = test_dr_age
+    } else {
+      print(paste("Uncaught title at: ", i, sep=""))
+      print(paste("The title unrecognized was: ", testData[i,2], sep=""))
+    }
+  }
+}
+
+"adding new variables to the table from using the existing ones"
+
+#child
+#We do a manual replacement here, because we weren't able to programmatically figure out the title.
+#We figured out it was 89 because the above print statement should have warned us.
+testData[89, 4] = test_miss_age
+
+testData["Child"] <- NA
+for (i in 1:nrow(testData)) {
+  if (testData$Age[i] <= 12) {
+    testData$Child[i] = 1
+  } else {
+    testData$Child[i] = 2
+  }
+}
+
+#family guy
+testData["Family"] = NA
+
+for(i in 1:nrow(testData)) {
+  x = testData$SibSp[i]
+  y = testData$Parch[i]
+  testData$Family[i] = x + y + 1
+}
+
+#Mom
+testData["Mother"] <- NA
+for(i in 1:nrow(testData)) {
+  if(testData$Name[i] == "Mrs" & testData$Parch[i] > 0) {
+    testData$Mother[i] = 1
+  } else {
+    testData$Mother[i] = 2
+  }
+}
+
+train.glm <- glm(Survived ~ Pclass + Sex + Age + Child +
+                   Sex*Pclass + Family + Mother, family = binomial, data = trainData)
+summary(train.glm)
+
+p.hats <- predict.glm(train.glm, newdata = testData, type = "response")
+
+survival <- NA
+for(i in 1:length(p.hats)) {
+  if(p.hats[i] > .5) {
+    survival[i] <- 1
+  } else {
+    survival[i] <- 0
+  }
+}
+
+sum(survival)
+"131 people are saved out of 418"
